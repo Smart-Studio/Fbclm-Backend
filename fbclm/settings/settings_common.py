@@ -10,7 +10,11 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+import configparser
+
+config = configparser.ConfigParser(allow_no_value=True)
 
 
 # Quick-start development settings - unsuitable for production
@@ -19,12 +23,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '*e&**hsat2og1+^(lq2ki@f8klkoxyxcwmjky@2+uk36^a55d='
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-TEMPLATE_DEBUG = True
-
 ALLOWED_HOSTS = []
+
+ADMINS = (
+    ('Admin', 'smartstudioit@gmail.com')
+)
+
+MANAGERS = ADMINS
 
 
 # Application definition
@@ -54,21 +59,6 @@ ROOT_URLCONF = 'fbclm.urls'
 
 WSGI_APPLICATION = 'fbclm.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/1.7/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'snippets',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',   # Or an IP Address that your DB is hosted on
-        'PORT': '3306',
-    }
-}
-
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
 
@@ -87,3 +77,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.7/howto/static-files/
 
 STATIC_URL = '/static/'
+
