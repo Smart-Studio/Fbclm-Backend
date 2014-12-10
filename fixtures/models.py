@@ -4,6 +4,9 @@ from django.db import models
 class Season(models.Model):
     season_name = models.CharField(max_length=100)
 
+    def __str__(self):
+        return self.season_name
+
 
 class League(models.Model):
     name = models.CharField(max_length=100)
