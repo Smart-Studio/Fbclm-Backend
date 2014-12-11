@@ -1,3 +1,8 @@
-from django.shortcuts import render
+from django.http import HttpResponse
 
-# Create your views here.
+from parser import parse_fixtures
+
+
+def index(request):
+    parse_fixtures()
+    return HttpResponse("Hello, world. You're at the polls index.")
