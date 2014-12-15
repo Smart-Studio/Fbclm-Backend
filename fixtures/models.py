@@ -13,6 +13,16 @@ class League(models.Model):
     season = models.ForeignKey(Season)
 
 
+class Group(models.Model):
+    name = models.CharField(max_length=100)
+    league = models.ForeignKey(League)
+
+
+class SubGroup(models.Model):
+    name = models.CharField(max_length=100)
+    group = models.ForeignKey(Group)
+
+
 class Team(models.Model):
     league = models.ForeignKey(League)
     name = models.CharField(max_length=100)
