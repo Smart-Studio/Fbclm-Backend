@@ -1,10 +1,13 @@
+# coding=utf-8
 import urllib
 import urllib2
+from datetime import datetime
 
 from bs4 import BeautifulSoup
 from django.db.transaction import atomic
+import pytz
 
-from models import Season, League, Group, SubGroup
+from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture
 
 
 FIXTURES_URL = 'http://www.fbclm.net/dinamico/competiciones/competiciones.asp'
@@ -47,7 +50,11 @@ GROUP_ID = 'id_grupo'
 MATCH_DAY_ID = 'id_jornada'
 
 
-def parse_fixtures():
+def parse_html():
+    """
+    Parse all fixtures from html
+    """
+
     content = urllib2.urlopen(FIXTURES_URL).read()
     parsed_html = BeautifulSoup(content)
     selectors_html = parsed_html.find(SELECTORS_HTML_TAG)
@@ -58,46 +65,42 @@ def parse_fixtures():
 
 @atomic
 def parse_seasons(seasons_html):
+    """
+
+    :param seasons_html:
+    :return:
+    """
     for season_html in seasons_html:
         season_id = season_html[VALUE_ATTR]
         season_name = season_html.string
-        season = Season.objects.filter(season_name=season_name)
 
-        if season.exists():
-            season = season[0]
-        else:
-            season = Season(season_name=season_html.string)
-            season.save()
+        season, created = Season.objects.update_or_create(season_name=season_name)
 
-        season_html = request_seasons_html(season_id=season_id)
-
-        parse_leagues(season, season_id, season_html)
+        if season_id == '20':
+            parse_leagues(season, season_id)
 
         if season.league_set.count() == 0:
             season.delete()
 
 
-def parse_leagues(season, season_id, season_html):
+def parse_leagues(season, season_id):
+    season_html = request_seasons_html(season_id=season_id)
     leagues_html = season_html.find(attrs={NAME_ATTRIBUTE: LEAGUE_ID})
-    for league_html in leagues_html:
+
+    for league_html in leagues_html.contents[1:]:
         league_name = league_html.string
-        if league_name:
-            league_id = league_html[VALUE_ATTR]
-            league_name = unicode(league_name)
-            league = League.objects.filter(name=league_name, season=season.id)
 
-            if league.exists():
-                league = league[0]
-            else:
-                league = season.league_set.create(name=league_name)
+        league_id = league_html[VALUE_ATTR]
+        league_name = unicode(league_name)
 
-            if league_id:
-                league_html = request_league_html(season_id=season_id, league_id=league_id)
-                # print season.season_name + " " + league.name + '\n'
-                parse_groups(season_id, league, league_id, league_html)
+        league, created = League.objects.update_or_create(name=league_name, season=season)
+
+        print season.season_name + " " + league.name + '\n'
+        parse_groups(season_id, league, league_id)
 
 
-def parse_groups(season_id, league, league_id, league_html):
+def parse_groups(season_id, league, league_id):
+    league_html = request_league_html(season_id=season_id, league_id=league_id)
     groups_html = league_html.find(attrs={NAME_ATTRIBUTE: GROUP_ID})
 
     if len(groups_html.contents) > 1:
@@ -112,49 +115,199 @@ def create_group(season_id, league, league_id, groups_html, has_subgroups):
         group_id = group_html[VALUE_ATTR]
         group_name = unicode(group_html.string)
 
-        group = Group.objects.filter(league_id=league.id, name=group_name)
-
-        if group.exists():
-            group = group[0]
-        else:
-            group = league.group_set.create(name=group_name)
+        group, created = Group.objects.update_or_create(name=group_name, league=league)
 
         if has_subgroups:
-            group_html = request_area_html(season_id, league_id, group_id)
-            parse_subgroups(group, group_id, group_html)
+            parse_subgroups(season_id, league, league_id, group, group_id)
+        else:
+            if not group_name.__contains__('FASE FINAL') and not (
+                            league.name == 'JUNIOR MASCULINO ESPECIAL' and group_name.__contains__('FASE')) \
+                    and not group_name == 'PLAY OFF ASCENSO 1/4 FINAL' \
+                    and not group_name == 'GRUPO ESTE - PLAY OFF' \
+                    and not group_name.__contains__('COPA PRESIDENTE') \
+                    and not group_name == 'COPA FEDERACION' \
+                    and not group_name == 'COPA IGUALDAD' \
+                    and not group_name == 'ESTE FASE 3 CRUCES' \
+                    and not group_name == 'CRUCES' \
+                    and not group_name == 'CRUCES 1 AL 4' \
+                    and not group_name == '1/4 FINAL' \
+                    and not group_name == 'COPA ADECCO PLATA' \
+                    and not group_name == 'FINAL A CUATRO' \
+                    and not group_name == 'COPA ADECCO BRONCE' \
+                    and not group_name.__contains__('TROFEO JCCM') \
+                    and not group_name.__contains__('CRUCES 0') \
+                    and not group_name == 'SERIES' \
+                    and not group_name.__contains__('ELIMINATORIAS') \
+                    and not group_name == 'FINAL' \
+                    and not group_name.__contains__('ASCENSO') \
+                    and not group_name.__contains__('PLAY-OFF') \
+                    and not group_name == 'FASE 2' \
+                    and not group_name == 'COPA PRIMAVERA FASE 1' \
+                    and not group_name == 'CUARTOS DE FINAL' \
+                    and not group_name.__contains__('MASCULINO 1') \
+                    and not group_name.__contains__('MASCULINO 5') \
+                    and not group_name == 'FASE DE CLASIFICACION' \
+                    and not league.name == 'SUPERCOPA F.B.C.M.' \
+                    and not group_name.__contains__('COPA 2') \
+                    and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 3') \
+                    and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 5') \
+                    and not group_name == 'ALCAZAR DE SAN JUAN MASCULINO FINAL':
+                print group_name
+                parse_match_day(season_id, league, league_id, group, group_id)
 
 
-def parse_subgroups(group, group_id, group_html):
+def parse_subgroups(season_id, league, league_id, group, group_id):
+    group_html = request_area_html(season_id, league_id, group_id)
     subgroups_html = group_html.find(attrs={NAME_ATTRIBUTE: GROUP_ID})
     for subgroup_html in subgroups_html.contents[1:]:
         subgroup_id = subgroup_html[VALUE_ATTR]
         subgroup_name = unicode(subgroup_html.string)
 
-        subgroup = SubGroup.objects.filter(group_id=group_id, name=subgroup_name)
+        subgroup, created = SubGroup.objects.update_or_create(name=subgroup_name, group=group)
 
-        if subgroup.exists():
-            subgroup = subgroup[0]
-        else:
-            subgroup = group.subgroup_set.create(name=subgroup_name)
+        parse_subgroup_match_day(season_id, league, league_id, group_id, subgroup, subgroup_id)
+
+
+def parse_match_day(season_id, league, league_id, group, group_id):
+    group_html = request_web_page(season_id, league_id, 0, group_id, 0)
+    match_days_html = group_html.find(attrs={NAME_ATTRIBUTE: MATCH_DAY_ID})
+
+    for match_day_html in match_days_html.contents[1:]:
+        match_day_id = match_day_html[VALUE_ATTR]
+        match_day_name = unicode(match_day_html.string)
+        match_day_name = match_day_name.split()[1][1:-1]
+        match_day_name = datetime.strptime(match_day_name, "%d/%m/%Y").replace(tzinfo=pytz.utc)
+
+        match_day, created = MatchDay.objects.update_or_create(date=match_day_name, group=group)
+
+        parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_day)
+
+
+def parse_subgroup_match_day(season_id, league, league_id, category_id, subgroup, subgroup_id):
+    subgroup_html = request_web_page(season_id, league_id, category_id, subgroup_id, 0)
+    match_days_html = subgroup_html.find(attrs={NAME_ATTRIBUTE: MATCH_DAY_ID})
+
+    for match_day_html in match_days_html.contents[1:]:
+        match_day_id = match_day_html[VALUE_ATTR]
+        match_day_name = unicode(match_day_html.string)
+        match_day_name = match_day_name.split()[1][1:-1]
+        match_day_name = datetime.strptime(match_day_name, "%d/%m/%Y").replace(tzinfo=pytz.utc)
+
+        match_day, created = MatchDay.objects.update_or_create(date=match_day_name, subgroup=subgroup)
+
+        parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_id, match_day_id, match_day)
+
+
+def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_day):
+    fixtures_html = request_web_page(season_id, league_id, 0, group_id, match_day_id)
+    fixtures_html = fixtures_html.find_all(attrs={"class", "cuerpotabla"})
+    fixture_index = 0
+
+    home_score = None
+    away_score = None
+    date = None
+
+    try:
+        for fixture_html in fixtures_html:
+            if len(fixture_html.contents) > 0:
+                if fixture_index == 2 or not fixture_html.contents[0].isspace():
+                    if fixture_index < 2:
+                        if len(fixture_html.contents) > 1:
+                            if fixture_index == 0:
+                                aux_date = fixture_html.contents[0]
+                                aux_date += ' ' + fixture_html.contents[1].string
+                                date = datetime.strptime(aux_date, "%d/%m/%y %H:%Mh").replace(tzinfo=pytz.utc)
+                            else:
+                                home_score = fixture_html.contents[0]
+                                away_score = fixture_html.contents[1].string
+                        else:
+                            home_score = 0
+                            away_score = 0
+
+                        fixture_index += 1
+                    else:
+                        home_team_name = unicode(fixture_html.contents[0].contents[0])
+                        home_team, created = Team.objects.update_or_create(name=home_team_name, league=league)
+
+                        away_team_name = unicode(fixture_html.contents[0].contents[1].string)
+                        away_team, created = Team.objects.update_or_create(name=away_team_name, league=league)
+
+                        fixture, created = Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
+                                                                            home_score=home_score,
+                                                                            away_team=away_team, away_score=away_score,
+                                                                            date=date)
+
+                        fixture_index = 0
+    except TypeError:
+        pass
+
+
+def parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_id, match_day_id, match_day):
+    fixtures_html = request_web_page(season_id, league_id, category_id, subgroup_id, match_day_id)
+    fixtures_html = fixtures_html.find_all(attrs={"class", "cuerpotabla"})
+    fixture_index = 0
+
+    home_score = None
+    away_score = None
+    date = None
+
+    try:
+        for fixture_html in fixtures_html:
+            if len(fixture_html.contents) > 0:
+                if fixture_index == 2 or not fixture_html.contents[0].isspace():
+                    if fixture_index < 2:
+                        if len(fixture_html.contents) > 1:
+                            if fixture_index == 0:
+                                aux_date = fixture_html.contents[0]
+                                if aux_date == 'Aplazado' or fixture_html.contents[1].string == 'Sin Hora' \
+                                        or match_day_id == '13853':  # 2014/2015 -> ALEVIN FEMENINO -> TOLEDO -> JORNADA-2
+                                    date = None
+                                else:
+                                    aux_date += ' ' + fixture_html.contents[1].string
+                                    date = datetime.strptime(aux_date, "%d/%m/%y %H:%Mh").replace(tzinfo=pytz.utc)
+                            else:
+                                home_score = fixture_html.contents[0]
+                                away_score = fixture_html.contents[1].string
+                        else:
+                            home_score = 0
+                            away_score = 0
+
+                        fixture_index += 1
+                    else:
+                        home_team_name = unicode(fixture_html.contents[0].contents[0])
+                        home_team, created = Team.objects.update_or_create(name=home_team_name, league=league)
+
+                        away_team_name = unicode(fixture_html.contents[0].contents[1].string)
+                        away_team, created = Team.objects.update_or_create(name=away_team_name, league=league)
+
+                        fixture, created = Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
+                                                                            home_score=home_score,
+                                                                            away_team=away_team, away_score=away_score,
+                                                                            date=date)
+
+                        fixture_index = 0
+    except TypeError:
+        pass
 
 
 def request_seasons_html(season_id):
-    return request_web_page(season_id=season_id, league_id=0, category_id=0, group_id=0)
+    return request_web_page(season_id=season_id, league_id=0, category_id=0, group_id=0, match_day_id=0)
 
 
 def request_league_html(season_id, league_id):
-    return request_web_page(season_id=season_id, league_id=league_id, category_id=0, group_id=0)
+    return request_web_page(season_id=season_id, league_id=league_id, category_id=0, group_id=0, match_day_id=0)
 
 
 def request_area_html(season_id, league_id, category_id):
-    return request_web_page(season_id=season_id, league_id=league_id, category_id=category_id, group_id=0)
+    return request_web_page(season_id=season_id, league_id=league_id, category_id=category_id, group_id=0,
+                            match_day_id=0)
 
 
 def request_group_html(season_id, league_id, group_id):
-    return request_web_page(season_id=season_id, league_id=league_id, category_id=0, group_id=group_id)
+    return request_web_page(season_id=season_id, league_id=league_id, category_id=0, group_id=group_id, match_day_id=0)
 
 
-def request_web_page(season_id, league_id, category_id, group_id):
+def request_web_page(season_id, league_id, category_id, group_id, match_day_id):
     headers = {ACCEPT_ENCODING: ENCODING,
                ACCEPT_LANGUAGE: LANGUAGE,
                CACHE_CONTROL: CACHE,
@@ -175,7 +328,7 @@ def request_web_page(season_id, league_id, category_id, group_id):
               LEAGUE_ID: league_id,
               CATEGORY_ID: category_id,
               GROUP_ID: group_id,
-              MATCH_DAY_ID: 0}
+              MATCH_DAY_ID: match_day_id}
 
     data = urllib.urlencode(values)
     request = urllib2.Request(FIXTURES_URL, data, headers)
