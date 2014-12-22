@@ -26,12 +26,13 @@ class SubGroup(models.Model):
 class Team(models.Model):
     league = models.ForeignKey(League)
     name = models.CharField(max_length=100)
-    badge = models.URLField()
+    badge = models.URLField(null=True)
 
 
 class MatchDay(models.Model):
     date = models.DateTimeField()
-    league = models.ForeignKey(League)
+    group = models.ForeignKey(Group, null=True, blank=True)
+    subgroup = models.ForeignKey(SubGroup, null=True, blank=True)
 
 
 class Fixture(models.Model):
@@ -40,4 +41,4 @@ class Fixture(models.Model):
     home_score = models.IntegerField(default=0)
     away_team = models.ForeignKey(Team, related_name="away_team")
     away_score = models.IntegerField(default=0)
-    date = models.DateTimeField()
+    date = models.DateTimeField(null=True, blank=True)
