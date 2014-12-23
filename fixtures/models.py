@@ -18,6 +18,10 @@ class Group(models.Model):
     league = models.ForeignKey(League)
 
 
+class KnockoutGroup(Group):
+    venue = models.CharField(max_length=100)
+
+
 class SubGroup(models.Model):
     name = models.CharField(max_length=100)
     group = models.ForeignKey(Group)
@@ -35,8 +39,14 @@ class MatchDay(models.Model):
     subgroup = models.ForeignKey(SubGroup, null=True, blank=True)
 
 
+class Knockout(models.Model):
+    stage = models.CharField(max_length=100)
+    group = models.ForeignKey(KnockoutGroup)
+
+
 class Fixture(models.Model):
-    match_day = models.ForeignKey(MatchDay)
+    match_day = models.ForeignKey(MatchDay, null=True, blank=True)
+    knockout = models.ForeignKey(Knockout, null=True, blank=True)
     home_team = models.ForeignKey(Team, related_name="home_team")
     home_score = models.IntegerField(default=0)
     away_team = models.ForeignKey(Team, related_name="away_team")
