@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from django.db.transaction import atomic
 import pytz
 
-from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture
+from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture, Knockout, KnockoutGroup
 
 
 FIXTURES_URL = 'http://www.fbclm.net/dinamico/competiciones/competiciones.asp'
@@ -16,6 +16,10 @@ FIXTURES_URL = 'http://www.fbclm.net/dinamico/competiciones/competiciones.asp'
 NAME_ATTRIBUTE = 'name'
 SELECTORS_HTML_TAG = 'table'
 VALUE_ATTR = 'value'
+DATE_FORMAT_SHORT_YEAR = '%d/%m/%y %H:%Mh'
+DATE_FORMAT_FULL_YEAR = '%d/%m/%Y %H:%Mh'
+DATE_FORMAT_MATCH_DAY = '%d/%m/%Y'
+TBODY_TAG = 'tbody'
 
 # Headers
 ACCEPT_ENCODING = 'Accept-Encoding'
@@ -115,45 +119,50 @@ def create_group(season_id, league, league_id, groups_html, has_subgroups):
         group_id = group_html[VALUE_ATTR]
         group_name = unicode(group_html.string)
 
-        group, created = Group.objects.update_or_create(name=group_name, league=league)
+        if group_name == 'COPA PRESIDENTE' or group_name == 'COPA FEDERACION':
+            group = KnockoutGroup.objects.update_or_create(name=group_name, league=league)[0]
+            parse_knockout(season_id, league, league_id, group, group_id)
+            return
 
-        if has_subgroups:
-            parse_subgroups(season_id, league, league_id, group, group_id)
+        group = Group.objects.update_or_create(name=group_name, league=league)[0]
+
+        if not has_subgroups and not group_name.__contains__('FASE FINAL') and not (
+                        league.name == 'JUNIOR MASCULINO ESPECIAL' and group_name.__contains__('FASE')) \
+                and not group_name == 'PLAY OFF ASCENSO 1/4 FINAL' \
+                and not group_name == 'GRUPO ESTE - PLAY OFF' \
+                and not group_name.__contains__('COPA PRESIDENTE') \
+                and not group_name == 'COPA FEDERACION' \
+                and not group_name == 'COPA IGUALDAD' \
+                and not group_name == 'ESTE FASE 3 CRUCES' \
+                and not group_name == 'CRUCES' \
+                and not group_name == 'CRUCES 1 AL 4' \
+                and not group_name == '1/4 FINAL' \
+                and not group_name == 'COPA ADECCO PLATA' \
+                and not group_name == 'FINAL A CUATRO' \
+                and not group_name == 'COPA ADECCO BRONCE' \
+                and not group_name.__contains__('TROFEO JCCM') \
+                and not group_name.__contains__('CRUCES 0') \
+                and not group_name == 'SERIES' \
+                and not group_name.__contains__('ELIMINATORIAS') \
+                and not group_name == 'FINAL' \
+                and not group_name.__contains__('ASCENSO') \
+                and not group_name.__contains__('PLAY-OFF') \
+                and not group_name == 'FASE 2' \
+                and not group_name == 'COPA PRIMAVERA FASE 1' \
+                and not group_name == 'CUARTOS DE FINAL' \
+                and not group_name.__contains__('MASCULINO 1') \
+                and not group_name.__contains__('MASCULINO 5') \
+                and not group_name == 'FASE DE CLASIFICACION' \
+                and not league.name == 'SUPERCOPA F.B.C.M.' \
+                and not group_name.__contains__('COPA 2') \
+                and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 3') \
+                and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 5') \
+                and not group_name == 'ALCAZAR DE SAN JUAN MASCULINO FINAL':
+            print group_name
+            parse_match_day(season_id, league, league_id, group, group_id)
         else:
-            if not group_name.__contains__('FASE FINAL') and not (
-                            league.name == 'JUNIOR MASCULINO ESPECIAL' and group_name.__contains__('FASE')) \
-                    and not group_name == 'PLAY OFF ASCENSO 1/4 FINAL' \
-                    and not group_name == 'GRUPO ESTE - PLAY OFF' \
-                    and not group_name.__contains__('COPA PRESIDENTE') \
-                    and not group_name == 'COPA FEDERACION' \
-                    and not group_name == 'COPA IGUALDAD' \
-                    and not group_name == 'ESTE FASE 3 CRUCES' \
-                    and not group_name == 'CRUCES' \
-                    and not group_name == 'CRUCES 1 AL 4' \
-                    and not group_name == '1/4 FINAL' \
-                    and not group_name == 'COPA ADECCO PLATA' \
-                    and not group_name == 'FINAL A CUATRO' \
-                    and not group_name == 'COPA ADECCO BRONCE' \
-                    and not group_name.__contains__('TROFEO JCCM') \
-                    and not group_name.__contains__('CRUCES 0') \
-                    and not group_name == 'SERIES' \
-                    and not group_name.__contains__('ELIMINATORIAS') \
-                    and not group_name == 'FINAL' \
-                    and not group_name.__contains__('ASCENSO') \
-                    and not group_name.__contains__('PLAY-OFF') \
-                    and not group_name == 'FASE 2' \
-                    and not group_name == 'COPA PRIMAVERA FASE 1' \
-                    and not group_name == 'CUARTOS DE FINAL' \
-                    and not group_name.__contains__('MASCULINO 1') \
-                    and not group_name.__contains__('MASCULINO 5') \
-                    and not group_name == 'FASE DE CLASIFICACION' \
-                    and not league.name == 'SUPERCOPA F.B.C.M.' \
-                    and not group_name.__contains__('COPA 2') \
-                    and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 3') \
-                    and not group_name.__contains__('ALCAZAR DE SAN JUAN MASCULINO 5') \
-                    and not group_name == 'ALCAZAR DE SAN JUAN MASCULINO FINAL':
-                print group_name
-                parse_match_day(season_id, league, league_id, group, group_id)
+             print 'subgroup'
+             # TODO parse_subgroups(season_id, league, league_id, group, group_id)
 
 
 def parse_subgroups(season_id, league, league_id, group, group_id):
@@ -176,7 +185,7 @@ def parse_match_day(season_id, league, league_id, group, group_id):
         match_day_id = match_day_html[VALUE_ATTR]
         match_day_name = unicode(match_day_html.string)
         match_day_name = match_day_name.split()[1][1:-1]
-        match_day_name = datetime.strptime(match_day_name, "%d/%m/%Y").replace(tzinfo=pytz.utc)
+        match_day_name = datetime.strptime(match_day_name, DATE_FORMAT_MATCH_DAY).replace(tzinfo=pytz.utc)
 
         match_day, created = MatchDay.objects.update_or_create(date=match_day_name, group=group)
 
@@ -191,7 +200,7 @@ def parse_subgroup_match_day(season_id, league, league_id, category_id, subgroup
         match_day_id = match_day_html[VALUE_ATTR]
         match_day_name = unicode(match_day_html.string)
         match_day_name = match_day_name.split()[1][1:-1]
-        match_day_name = datetime.strptime(match_day_name, "%d/%m/%Y").replace(tzinfo=pytz.utc)
+        match_day_name = datetime.strptime(match_day_name, DATE_FORMAT_MATCH_DAY).replace(tzinfo=pytz.utc)
 
         match_day, created = MatchDay.objects.update_or_create(date=match_day_name, subgroup=subgroup)
 
@@ -216,7 +225,7 @@ def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_d
                             if fixture_index == 0:
                                 aux_date = fixture_html.contents[0]
                                 aux_date += ' ' + fixture_html.contents[1].string
-                                date = datetime.strptime(aux_date, "%d/%m/%y %H:%Mh").replace(tzinfo=pytz.utc)
+                                date = datetime.strptime(aux_date, DATE_FORMAT_SHORT_YEAR).replace(tzinfo=pytz.utc)
                             else:
                                 home_score = fixture_html.contents[0]
                                 away_score = fixture_html.contents[1].string
@@ -232,13 +241,13 @@ def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_d
                         away_team_name = unicode(fixture_html.contents[0].contents[1].string)
                         away_team, created = Team.objects.update_or_create(name=away_team_name, league=league)
 
-                        fixture, created = Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
-                                                                            home_score=home_score,
-                                                                            away_team=away_team, away_score=away_score,
-                                                                            date=date)
+                        Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
+                                                         home_score=home_score, away_team=away_team,
+                                                         away_score=away_score, date=date)
 
                         fixture_index = 0
     except TypeError:
+        print 'Error in fixtures'
         pass
 
 
@@ -264,7 +273,7 @@ def parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_
                                     date = None
                                 else:
                                     aux_date += ' ' + fixture_html.contents[1].string
-                                    date = datetime.strptime(aux_date, "%d/%m/%y %H:%Mh").replace(tzinfo=pytz.utc)
+                                    date = datetime.strptime(aux_date, DATE_FORMAT_SHORT_YEAR).replace(tzinfo=pytz.utc)
                             else:
                                 home_score = fixture_html.contents[0]
                                 away_score = fixture_html.contents[1].string
@@ -280,14 +289,50 @@ def parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_
                         away_team_name = unicode(fixture_html.contents[0].contents[1].string)
                         away_team, created = Team.objects.update_or_create(name=away_team_name, league=league)
 
-                        fixture, created = Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
-                                                                            home_score=home_score,
-                                                                            away_team=away_team, away_score=away_score,
-                                                                            date=date)
+                        Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
+                                                         home_score=home_score, away_team=away_team,
+                                                         away_score=away_score, date=date)
 
                         fixture_index = 0
     except TypeError:
         pass
+
+
+def parse_knockout(season_id, league, league_id, group, group_id):
+    rows = list(request_web_page(season_id, league_id, 0, group_id, 0).find(TBODY_TAG).children)
+
+    venue = rows[6].next.next.next.next[6:]
+    group.venue = venue
+    group.save()
+
+    knockouts_html = rows[8:]
+    knockout_index = 0
+    knockout = None
+
+    for knockout_html in knockouts_html:
+        if knockout_index % 2 == 0:
+            knockout_name = knockout_html.next.text.split()[0]
+            knockout = Knockout.objects.update_or_create(group=group, stage=knockout_name)[0]
+        else:
+            fixtures_html = list(knockout_html.find(TBODY_TAG).children)[2::2]
+
+            for fixture_html in fixtures_html:
+                fixture_html = list(fixture_html.children)[2:5]
+                date_strings = list(fixture_html[0].strings)
+                date = datetime.strptime(date_strings[0] + ' ' + date_strings[1], DATE_FORMAT_FULL_YEAR).replace(
+                    tzinfo=pytz.utc)
+
+                score_strings = list(fixture_html[1].strings)
+                teams_strings = list(fixture_html[2].strings)
+
+                home_team = Team.objects.update_or_create(name=teams_strings[0], league=league)[0]
+                away_team = Team.objects.update_or_create(name=teams_strings[1], league=league)[0]
+
+                Fixture.objects.update_or_create(knockout=knockout, home_team=home_team,
+                                                 home_score=score_strings[0], away_team=away_team,
+                                                 away_score=score_strings[1], date=date)
+
+        knockout_index += 1
 
 
 def request_seasons_html(season_id):
@@ -333,4 +378,4 @@ def request_web_page(season_id, league_id, category_id, group_id, match_day_id):
     data = urllib.urlencode(values)
     request = urllib2.Request(FIXTURES_URL, data, headers)
     response = urllib2.urlopen(request)
-    return BeautifulSoup(response.read())
+    return BeautifulSoup(response.read(), "html5lib")
