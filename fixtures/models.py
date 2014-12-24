@@ -52,3 +52,20 @@ class Fixture(models.Model):
     away_team = models.ForeignKey(Team, related_name="away_team")
     away_score = models.IntegerField(default=0)
     date = models.DateTimeField(null=True, blank=True)
+
+
+class TableRow(models.Model):
+    match_day = models.ForeignKey(MatchDay)
+    team = models.ForeignKey(Team)
+    won = models.IntegerField()
+    lost = models.IntegerField()
+    scored = models.IntegerField()
+    against = models.IntegerField()
+
+    @property
+    def played(self):
+        return self.won + self.lost
+
+    @property
+    def diff(self):
+        return self.scored - self.against

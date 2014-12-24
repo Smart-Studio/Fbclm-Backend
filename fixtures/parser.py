@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from django.db.transaction import atomic
 import pytz
 
-from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture, Knockout, KnockoutGroup
+from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture, Knockout, KnockoutGroup, TableRow
 
 
 FIXTURES_URL = 'http://www.fbclm.net/dinamico/competiciones/competiciones.asp'
@@ -206,6 +206,7 @@ def parse_subgroup_match_day(season_id, league, league_id, category_id, subgroup
 
 def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_day):
     fixtures_rows = list(request_web_page(season_id, league_id, 0, group_id, match_day_id).find(TBODY_TAG).children)
+    table_rows = list(fixtures_rows[len(fixtures_rows) - 1].find(TBODY_TAG).children)[1:]
     fixtures_rows = list(fixtures_rows[8].find(TBODY_TAG).children)[1::2]
 
     for fixture_html in fixtures_rows:
@@ -232,10 +233,13 @@ def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_d
                                          home_score=score_strings[0], away_team=away_team,
                                          away_score=score_strings[1], date=date)
 
+    parse_table(league, match_day, table_rows)
+
 
 def parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_id, match_day_id, match_day):
     fixtures_rows = list(
         request_web_page(season_id, league_id, category_id, subgroup_id, match_day_id).find(TBODY_TAG).children)
+    table_rows = list(fixtures_rows[len(fixtures_rows) - 1].find(TBODY_TAG).children)[1:]
     fixtures_rows = list(fixtures_rows[8].find(TBODY_TAG).children)[1::2]
 
     for fixture_html in fixtures_rows:
@@ -276,6 +280,23 @@ def parse_subgroup_fixtures(season_id, league, league_id, category_id, subgroup_
         Fixture.objects.update_or_create(match_day=match_day, home_team=home_team,
                                          home_score=score_strings[0], away_team=away_team,
                                          away_score=score_strings[1], date=date)
+
+    parse_table(league, match_day, table_rows)
+
+
+def parse_table(league, match_day, table_rows_html):
+    for table_row_html in table_rows_html:
+        table_row_html = list(table_row_html.children)[2:8]
+        team_name = table_row_html[0].string
+        won = table_row_html[2].string
+        lost = table_row_html[3].string
+        scored = table_row_html[4].string
+        against = table_row_html[5].string
+
+        team = Team.objects.update_or_create(name=unicode(team_name), league=league)[0]
+
+        TableRow.objects.update_or_create(match_day=match_day, team=team, won=won, lost=lost, scored=scored,
+                                          against=against)
 
 
 def parse_knockout(season_id, league, league_id, group, group_id):
