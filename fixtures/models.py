@@ -10,12 +10,18 @@ class Season(models.Model):
 
 class League(models.Model):
     name = models.CharField(max_length=100)
-    season = models.ForeignKey(Season)
+    season = models.ForeignKey(Season, related_name='leagues')
+
+    def __str__(self):
+        return self.name + self.season
 
 
 class Group(models.Model):
     name = models.CharField(max_length=100)
-    league = models.ForeignKey(League)
+    league = models.ForeignKey(League, related_name='groups')
+
+    def __str__(self):
+        return self.name + self.league
 
 
 class KnockoutGroup(Group):
@@ -24,19 +30,19 @@ class KnockoutGroup(Group):
 
 class SubGroup(models.Model):
     name = models.CharField(max_length=100)
-    group = models.ForeignKey(Group)
+    group = models.ForeignKey(Group, related_name='subgroups')
 
 
 class Team(models.Model):
-    league = models.ForeignKey(League)
+    league = models.ForeignKey(League, related_name='teams')
     name = models.CharField(max_length=100)
     badge = models.URLField(null=True)
 
 
 class MatchDay(models.Model):
     date = models.DateTimeField()
-    group = models.ForeignKey(Group, null=True, blank=True)
-    subgroup = models.ForeignKey(SubGroup, null=True, blank=True)
+    group = models.ForeignKey(Group, null=True, blank=True, related_name='match_days')
+    subgroup = models.ForeignKey(SubGroup, null=True, blank=True, related_name='match_days')
 
 
 class Knockout(models.Model):
@@ -45,7 +51,7 @@ class Knockout(models.Model):
 
 
 class Fixture(models.Model):
-    match_day = models.ForeignKey(MatchDay, null=True, blank=True)
+    match_day = models.ForeignKey(MatchDay, null=True, blank=True, related_name='fixtures')
     knockout = models.ForeignKey(Knockout, null=True, blank=True)
     home_team = models.ForeignKey(Team, related_name="home_team")
     home_score = models.IntegerField(default=0)
@@ -61,6 +67,7 @@ class TableRow(models.Model):
     lost = models.IntegerField()
     scored = models.IntegerField()
     against = models.IntegerField()
+
 
     @property
     def played(self):
