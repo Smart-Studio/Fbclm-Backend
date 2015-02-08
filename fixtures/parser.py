@@ -83,7 +83,7 @@ def parse_seasons(seasons_html):
         if season_id == '20':
             parse_leagues(season, season_id)
 
-        if season.league_set.count() == 0:
+        if season.leagues.count() == 0:
             season.delete()
 
 
@@ -207,7 +207,11 @@ def parse_subgroup_match_day(season_id, league, league_id, category_id, subgroup
 def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_day):
     fixtures_rows = list(request_web_page(season_id, league_id, 0, group_id, match_day_id).find(TBODY_TAG).children)
     table_rows = list(fixtures_rows[len(fixtures_rows) - 1].find(TBODY_TAG).children)[1:]
-    fixtures_rows = list(fixtures_rows[8].find(TBODY_TAG).children)[1::2]
+    try:
+        fixtures_rows = list(fixtures_rows[8].find(TBODY_TAG).children)[1::2]
+    except AttributeError:
+        #TODO handle this correctly
+        return
 
     for fixture_html in fixtures_rows:
         fixture_html = list(fixture_html.children)[1:]
