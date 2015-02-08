@@ -1,4 +1,4 @@
-from settings_common import *
+from fbclm.settings.settings_common import *
 
 DEBUG = False
 TEMPLATE_DEBUG = False

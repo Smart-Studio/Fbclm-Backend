@@ -1,13 +1,14 @@
 # coding=utf-8
-import urllib
-import urllib2
 from datetime import datetime
 
 from bs4 import BeautifulSoup
 from django.db.transaction import atomic
+from pytz import unicode
+from urllib.parse import urlencode
+from urllib.request import urlopen
+from urllib.request import Request
+from fixtures.models import Season, League, Group, SubGroup, MatchDay, Team, Fixture, Knockout, KnockoutGroup, TableRow
 import pytz
-
-from models import Season, League, Group, SubGroup, MatchDay, Team, Fixture, Knockout, KnockoutGroup, TableRow
 
 
 FIXTURES_URL = 'http://www.fbclm.net/dinamico/competiciones/competiciones.asp'
@@ -59,12 +60,12 @@ def parse_html():
     Parse all fixtures from html
     """
 
-    content = urllib2.urlopen(FIXTURES_URL).read()
+    content = urlopen(FIXTURES_URL).read()
     parsed_html = BeautifulSoup(content)
     selectors_html = parsed_html.find(SELECTORS_HTML_TAG)
     seasons_html = selectors_html.find(attrs={NAME_ATTRIBUTE: SEASON_ID})
 
-    print parse_seasons(seasons_html)
+    print(parse_seasons(seasons_html))
 
 
 @atomic
@@ -210,7 +211,7 @@ def parse_fixtures(season_id, league, league_id, group_id, match_day_id, match_d
     try:
         fixtures_rows = list(fixtures_rows[8].find(TBODY_TAG).children)[1::2]
     except AttributeError:
-        #TODO handle this correctly
+        # TODO handle this correctly
         return
 
     for fixture_html in fixtures_rows:
@@ -380,7 +381,7 @@ def request_web_page(season_id, league_id, category_id, group_id, match_day_id):
               GROUP_ID: group_id,
               MATCH_DAY_ID: match_day_id}
 
-    data = urllib.urlencode(values)
-    request = urllib2.Request(FIXTURES_URL, data, headers)
-    response = urllib2.urlopen(request)
+    data = urlencode(values)
+    request = Request(FIXTURES_URL, data, headers)
+    response = urlopen(request)
     return BeautifulSoup(response.read(), "html5lib")
