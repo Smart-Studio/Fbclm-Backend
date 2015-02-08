@@ -1,4 +1,4 @@
-from settings_common import *
+from fbclm.settings.settings_common import *
 
 config.read('%s/settings/config/settings_dev.cfg' % BASE_DIR)
 
