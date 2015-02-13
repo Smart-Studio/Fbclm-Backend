@@ -17,7 +17,7 @@ limitations under the License.
 from rest_framework import viewsets
 from rest_framework_extensions.mixins import NestedViewSetMixin, DetailSerializerMixin
 
-from fixtures.filter import LeaguesFilter, GroupsFilter, SubGroupsFilter
+from fixtures.filters import LeaguesFilter, GroupsFilter, SubGroupsFilter
 from fixtures.models import Season, League, Group, SubGroup, Team, KnockoutGroup, Knockout, MatchDay, Fixture, TableRow
 from fixtures.serializers import SeasonSerializer, LeagueSerializer, LeagueDetailSerializer, GroupSerializer, \
     GroupDetailSerializer, SubGroupSerializer, TeamSerializer, KnockoutGroupSerializer, KnockoutSerializer, \
